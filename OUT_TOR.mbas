@@ -1,0 +1,39 @@
+module OUT_TOR
+
+dim
+
+
+
+
+ OUT1           as sbit at  RA0_bit    ' ****
+ OUT2           as sbit at  RA1_bit    ' ****
+ OUT3           as sbit at  RA2_bit    ' ****
+ OUT4           as sbit at  RA3_bit
+ OUT5           as sbit at  RA4_bit
+ OUT6           as sbit at  RA5_bit
+ OUT7           as sbit at  RA6_bit
+ OUT8           as sbit at  RA7_bit
+ OUT16           as sbit at  RC1_bit    ' ****
+ OUT15           as sbit at  RC0_bit    ' ****
+ OUT14           as sbit at  RB5_bit    ' ****
+ OUT13           as sbit at  RB4_bit
+ OUT12           as sbit at  RB3_bit
+ OUT11           as sbit at  RB2_bit
+ OUT10           as sbit at  RB1_bit
+ OUT9            as sbit at  RB0_bit
+ firmware_run_LED  as sbit at  RE1_bit
+ in_communication  as sbit at  RD7_bit
+ out_communication as sbit at  RD6_bit
+ RS485_direction   as sbit at  RE0_bit
+ device_adr0       as sbit at  RD2_bit
+ device_adr1       as sbit at  RD3_bit
+ device_adr2       as sbit at  RD4_bit
+
+
+
+Out_                   as word
+
+implements
+
+
+end.

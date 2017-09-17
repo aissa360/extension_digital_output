@@ -1,0 +1,80 @@
+program OUTPUT_TOR
+' Declarations section
+include "OUT_TOR"
+
+
+   sub procedure MCUInit()
+       OSCCON  = %01100000
+       OSCCON2 = %00000100
+       OSCTUNE = %01000000
+       ANSELA = 0
+       ANSELB = 0
+       ANSELC = 0
+       ANSELD = 0
+       ANSELE = 0
+       INTCON = 0x00
+       TRISA  = 0X00        '''''' *** OUT8.....OUT1
+       PORTA = 0
+       TRISD =  %00011100   '''' SDA2,SCL2 , sw1,sw2,sw3,*,led21,led22
+       'PORTD = 0
+       TRISB =  0X00        ''''''' PGC PGD , OUT14....OUT9.
+       PORTB = 0
+       TRISC =  %11000000   ''''' RX,TX,*,SAD,SCL,*,OUT16,OUT15
+       PORTC = 0
+       TRISE.1 = 0          '''''' LED23
+       TRISE.0 = 0
+       TRISE.2 = 0           '' *
+       PORTE = 0
+       TXSTA1.BRGH = 0
+       BAUDCON1.BRG16 = 0
+       SPBRGH1= %00000000
+       SPBRG1 = %00110011
+       TXSTA1.SYNC = 0
+       RCSTA1.SPEN = 1
+       TXSTA1.TXEN = 1
+       RCSTA1.CREN = 1
+   end sub
+
+dim
+   Outl, Outh,I_send as byte
+   trame_send as byte[30]
+    OUTPUT as word
+     adresse_EXT  as byte
+     frame_send_size  as byte
+
+
+main:
+MCUInit()
+RS485_direction = 1
+
+while(true)
+            adresse_EXT = 0
+            adresse_EXT.2 = portD.4
+            adresse_EXT.1 = portD.3
+            adresse_EXT.0 = portD.2
+firmware_run_LED = not firmware_run_LED
+                trame_send[0] = "@"
+                trame_send[1] = (adresse_EXT >> 4) and 0x0F + 48
+                trame_send[2] =  adresse_EXT and 0x0F + 48
+                trame_send[3] = "c"
+                trame_send[4] = 49
+                trame_send[5] = 49
+                trame_send[6] = "*"
+                frame_send_size = 6
+
+    for I_send = 0 TO frame_send_size
+     Txreg1 = trame_send [I_send]
+
+while TXSTA1.TRMT = 0
+wend
+    next I_send
+
+ delay_ms(100)
+
+wend
+
+
+
+
+'   Main program
+end.

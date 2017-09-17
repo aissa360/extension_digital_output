@@ -1,0 +1,574 @@
+'11-05-2017 : add timeout at reception.
+program OUTPUT_TOR
+' Declarations section
+include "OUT_TOR"
+include "I2C_Routines"
+include "EEPROM_Routines"
+include "Convert_Routines"
+symbol _ON_ = 1
+symbol _OFF_ = 0
+
+'rxFrameState'
+symbol IDLE           = 0
+symbol STARTING       = 1
+symbol FINISHED       = 2
+symbol INTERRUPTED    = 3
+symbol TIMED_OUT      = 4
+symbol WAITING        = 5
+symbol PROCESSING     = 6
+
+const TMR4_TIMEOUT = 40 ' 10ms timeout'
+const ext_type as byte[2] = ("1","0")
+
+const output_number = 16
+const RXBUFFER_SIZE = 30
+
+dim i,DATA_EEPROM,adress_,data_in, disconnected,first_use as byte
+    out_com_led_cntr,in_com_led_cntr as word
+  
+    
+    timeout_counter, timeout_x400us as word
+     timeout_cmd as byte
+     
+     
+    Outl, Outh,i_send as byte
+    rxBuffer,trame_send as byte[RXBUFFER_SIZE]
+    ''''''''
+    clear_wdt as byte ''' 23  11 16 clear WDT
+    out_N as word
+    k,incRxBuffer,rxFrameSize,ExtAddress,addr_ext,action,i_receive,i_int,i_t0,txFrameSize,i_main,i_wdt as byte
+    pulse_duration,pulse_time as word[output_number]
+    P_cmd_flag_ladr,pulse_duration_hadr,pulse_duration_ladr,pulse_data_update as byte
+    P_duration,P_cmd_flag as word
+   addressL_clear,addressH_clear,j_memory ,i_memory,erase_memory as word
+output_last_ladr, output_last,output_last_hadr,output_ as word
+  select_output,stat_out as word
+  reset_carte as byte
+  fcs_to_controler,i_fcs,fcs_arrived as byte
+  
+ dim response_timer as word
+    send_answer as bit
+
+  ext_msg_duration_cntr as byte
+rxFrameState ,timeoutTimerState as byte
+
+
+
+sub procedure fcs_ext_to_controler()
+  fcs_to_controler = "@"
+  for i_fcs = 1 to txFrameSize - 3
+  fcs_to_controler =  fcs_to_controler xor trame_send[i_fcs]
+  next i_fcs
+  if  ((fcs_to_controler >> 4) and 0x0F) <  10 then
+          trame_send[txFrameSize - 2] = ((fcs_to_controler >> 4) and 0x0F)+48
+          else
+          trame_send[txFrameSize - 2] = ((fcs_to_controler >> 4) and 0x0F)+55
+          end if
+
+          if  ( fcs_to_controler and 0x0F) <  10 then
+          trame_send[txFrameSize - 1] = ( fcs_to_controler and 0x0F) +48
+          else
+          trame_send[txFrameSize - 1] = ( fcs_to_controler and 0x0F) +55
+ end if
+  'trame_send[txFrameSize - 2] = fcs_to_controler
+end sub
+
+sub function checkRxFrameFCS() as byte
+
+  dim fcs_calculated, fcs_arrived as byte
+  fcs_calculated = "@"
+  for i_fcs = 1 to rxFrameSize -3
+   fcs_calculated = fcs_calculated xor rxBuffer[i_fcs]
+  next i_fcs
+
+  if rxBuffer[rxFrameSize -2] < 58 then
+  fcs_arrived =  (rxBuffer[rxFrameSize -2]-48)*16
+  else
+  fcs_arrived =  (rxBuffer[rxFrameSize -2]-55)*16
+  end if
+
+  if rxBuffer[rxFrameSize -1] < 58 then
+  fcs_arrived =  (rxBuffer[rxFrameSize -1]-48) + fcs_arrived
+  else
+  fcs_arrived =  (rxBuffer[rxFrameSize -1]-55) + fcs_arrived
+  end if
+
+  if(fcs_calculated = fcs_arrived) then
+  result = TRUE
+  else 
+  result = FALSE
+  end if
+end sub
+  
+sub procedure apply_action
+ out1  =  out_.0
+ out2  =  out_.1
+ out3  =  out_.2
+ out4  =  out_.3
+ out5  =  out_.4
+ out6  =  out_.5
+ out7  =  out_.6
+ out8  =  out_.7
+ out9  =  out_.8
+ out10 =  out_.9
+ out11 =  out_.10
+ out12 =  out_.11
+ out13 =  out_.12
+ out14 =  out_.13
+ out15 =  out_.14
+ out16 =  out_.15
+end sub
+
+
+sub procedure MCUInit()
+  OSCCON  = %01110000     'configure oscillator
+  OSCCON2 = %00000100
+  OSCTUNE = %11000000
+  INTCON  = %00000000
+  ANSELA = 0
+  ANSELB = 0
+  ANSELC = 0
+  ANSELD = 0
+  ANSELE = 0
+  TRISA  = 0X00        '''''' *** OUT8.....OUT1
+  PORTA = 0
+  TRISD =  %00011100   '''' SDA2,SCL2 , sw1,sw2,sw3,*,led21,led22
+  TRISB =  0X00        ''''''' PGC PGD , OUT14....OUT9.
+  PORTB = 0
+  TRISC =  %11000000   ''''' RX,TX,*,SAD,SCL,*,OUT16,OUT15
+  PORTC = 0
+  TRISE.1 = 0          '''''' LED23
+  TRISE.0 = 0
+  TRISE.2 = 0           '' *
+  PORTE = 0
+  TXSTA1.BRGH = 1
+  BAUDCON1.BRG16 = 1
+  SPBRGH1= %00000000
+  SPBRG1 = %01000100
+  TXSTA1.SYNC = 0
+  RCSTA1.SPEN = 1
+  TXSTA1.TXEN = 1
+  RCSTA1.CREN = 1
+  BAUDCON1.WUE = 0
+  T0CON = %10000101
+  TMR0H = 0x3C
+  TMR0L = 0xB0
+  T5CON = %00100011
+  TMR5H =  0x63
+  TMR5L =  0xC0
+          'timer 4 timeout'
+          'enable tmr4, 8 bits mode, prescalaire 16 tmr1_clock = 1 MHz. ....256 us
+      IPR5.TMR4IP = 0
+      PIR5.TMR4IF = 0
+      PIE5.TMR4IE = 0
+      TMR4 = 0
+      T4CON   = %00000010
+
+  INTCON2.TMR0IP = 0
+  INTCON2.RBIP = 0
+  INTCON3.INT2IP = 0
+  INTCON3.INT1IP = 0
+  IPR1 = 0
+  IPR1.RC1IP = 1
+  IPR2 = 0
+  IPR3 = 0
+  IPR4 = 0
+  IPR5 = 0
+  PIR1.RC1IF  = 0
+  PIE1.RC1IE = 1
+  INTCON.TMR0IF = 0
+  INTCON.TMR0IE = 1
+  PIR5.TMR5IF = 0
+  PIE5.TMR5IE = 1
+  IPR5.TMR5IP = 0
+  RCON.7 = 1
+  WDTCON.SWDTEN = 1
+end sub
+sub procedure start_timeout_cmd()
+  if(timeoutTimerState = _OFF_) then
+    timeoutTimerState = _ON_
+    TMR4 = 0
+    PIR5.TMR4IF = 0
+    PIE5.TMR4IE = 1
+    T4CON   = %00000110 
+    timeout_counter = 0
+  end if
+end sub
+
+sub procedure stop_timeout_cmd()
+    T4CON   = %00000010     
+    TMR4 = 0
+    PIR5.TMR4IF = 0
+    PIE5.TMR4IE = 0
+    timeoutTimerState = _OFF_
+end sub
+
+sub procedure WaitFrameReading()
+  while ((rxFrameState = STARTING)) 'or Waiting'
+  wend
+end sub
+
+sub procedure send_frame()
+  
+  WaitFrameReading()
+
+  trame_send[txFrameSize-3]  = reset_carte + 48
+  trame_send[txFrameSize] = "*"
+  fcs_ext_to_controler()
+  RS485_direction = 1
+  for I_send = 0 TO txFrameSize
+     Txreg1 = trame_send [I_send]
+     while TXSTA1.TRMT = 0
+     wend
+  next I_send
+  RS485_direction = 0
+  reset_carte = 0
+end sub
+
+sub procedure clear_eeprom()
+
+   addressH_clear = 0X00
+   addressL_clear = 0X00
+   for i_memory = 0 to 0X3F
+       out_communication = not out_communication
+       firmware_run_LED  = not firmware_run_LED
+       in_communication = not in_communication
+      for i_main = 0 to 3
+      restart5:
+       i2c_start1()
+       i2c_write1(0xA0)
+       if i2c_ack_check1<> 0 then
+          goto restart5
+       end if
+       i2c_write1(addressH_clear)
+       if i2c_ack_check1<> 0 then
+          goto restart5
+       end if
+       i2c_write1(addressL_clear)
+       if i2c_ack_check1<> 0 then
+          goto restart5
+       end if
+       for j_memory = 0 to 63
+           i2c_write1(0X00)
+           if i2c_ack_check1<> 0 then
+              goto restart5
+           end if
+       next j_memory
+       addressL_clear = addressL_clear + 64
+       addressH_clear = addressH_clear + addressL_clear/256
+       addressL_clear = addressL_clear and 0XFF
+       i2c_stop1()
+     next i_main
+   next i_memory
+end sub
+
+
+sub procedure rxFrameCaseProcessing()
+ if checkRxFrameFCS() = TRUE then
+   select case rxBuffer[3]
+     case ord("d")
+
+     erase_memory = 1
+     'txFrameSize =  7
+     
+     
+     case ord("P")
+        out_N =  ((rxBuffer[4]-48) ) *10 + (rxBuffer[5]-48)
+        pulse_duration[out_N] = (rxBuffer[6]-48)*1000
+        pulse_duration[out_N] = pulse_duration[out_N] + (rxBuffer[7]-48)*100
+        pulse_duration[out_N] = pulse_duration[out_N] + (rxBuffer[8]-48)*10
+        pulse_duration[out_N] = pulse_duration[out_N] + rxBuffer[9]-48
+        P_duration = pulse_duration[out_N]
+        P_cmd_flag.out_N = 1
+        pulse_duration_hadr = 0x00
+        pulse_duration_ladr = 0x00
+        pulse_data_update = 1
+        for i_receive = 0 to output_number-1
+            if out_N <> i_receive then      'increment address until TP adress is reached.
+               pulse_duration_ladr =  pulse_duration_ladr    + 2   'LO(tab_duree_imp1[out_p])
+            else
+               break
+            end if
+        next i_receive
+        'txFrameSize = 13
+        case ord("p")
+        out_N =  ((rxBuffer[4]-48) ) *10 + (rxBuffer[5]-48)
+        pulse_duration[out_N] = 0
+        P_cmd_flag.out_N = 0
+        pulse_data_update = 1
+        'txFrameSize =  9
+     case ord("W")
+
+        out_N =  ((rxBuffer[4]-48) ) *10 + (rxBuffer[5]-48)
+        k = rxBuffer[6] - 48
+        out_.out_N = k
+        pulse_time[out_N] = 0
+        apply_action
+     case "T" ''''@00T XXXX AAAA fcs 'XX les sortie concerné, AA state
+
+       select_output      =   Chr_to_Hex(rxBuffer[4],rxBuffer[5])*256 +  Chr_to_Hex(rxBuffer[6],rxBuffer[7])
+       stat_out           =   Chr_to_Hex(rxBuffer[8],rxBuffer[9])*256 +  Chr_to_Hex(rxBuffer[10],rxBuffer[11])
+
+
+      for i_receive  = 0 to output_number-1
+          if select_output.i_receive = 1 then
+             out_.i_receive = stat_out.i_receive
+             pulse_time[i_receive] = 0
+          end if
+       next i_receive
+
+        apply_action
+     case "R"
+        txFrameSize = 0
+        disconnected = 0
+        out_communication = 1
+        out_com_led_cntr = 0
+        trame_send[0] = "@"
+        trame_send[1] = (ExtAddress >> 4) and 0x0F + 48
+        trame_send[2] =  ExtAddress and 0x0F + 48
+        
+        'if (rxBuffer[4]=ext_type[1]) and (rxBuffer[5]=ext_type[0]) then
+           trame_send[3] = "R"
+           trame_send[4] = ext_type[1]
+           trame_send[5] = ext_type[0]
+           txFrameSize = 9
+        send_answer = 1
+        'send_frame()
+   end select
+ end if
+end sub
+sub procedure checkExtAddress()
+ ExtAddress = 0
+ ExtAddress.2 = device_adr2
+ ExtAddress.1 = device_adr1
+ ExtAddress.0 = device_adr0
+end sub  
+
+Sub procedure Interrupt()
+  if PIR1.RC1IF = 1 then
+      rxBuffer[incRxBuffer]  = RCREG1
+      if rxBuffer[0] = "@"       then  ' @00W011fcs*
+        rxFrameState = STARTING
+        start_timeout_cmd()
+        if rxBuffer[incRxBuffer] = "*"  then
+         rxFrameState = FINISHED
+         rxFrameSize = incRxBuffer
+         incRxBuffer = 0
+         stop_timeout_cmd()
+         addr_ext =  (rxBuffer[1]-48) *10  + (rxBuffer[2]-48)
+         checkExtAddress()
+         if (ExtAddress = addr_ext) THEN
+           rxFrameState = PROCESSING
+         end if
+        else
+         inc(incRxBuffer)
+        end if
+      else
+       incRxBuffer = 0
+      end if
+ end if
+end sub
+
+sub procedure interrupt_low
+  if(PIR5.TMR4IF = 1) then
+    timeout_counter = timeout_counter +1
+    if timeout_counter > TMR4_TIMEOUT then
+     timeout_counter = 0
+     stop_timeout_cmd()
+     if(rxFrameState = STARTING) then
+      rxFrameState = TIMED_OUT
+      else
+      if(rxFrameState = FINISHED) then
+        rxFrameState = IDLE
+      end if
+     end if
+
+    end if
+    PIR5.TMR4IF = 0
+  end if
+
+  if PIR5.TMR5IF = 1 then
+   TMR5H =  0x63
+   TMR5L =  0xC0
+   
+   PIR5.TMR5IF = 0
+ end if
+
+ if INTCON.TMR0IF = 1 then
+       TMR0H =  0x3C
+       TMR0L =  0xB0
+       i_t0 = i_t0 + 1
+       if P_cmd_flag <> 0 then
+          for i_int = 0 to output_number-1
+              pulse_time[i_int] = pulse_time[i_int] + 200
+              if (pulse_time[i_int] >= pulse_duration[i_int]) and (P_cmd_flag.i_int = 1 )then
+                 out_.i_int = 0
+                 apply_action
+                 pulse_time[i_int] = 0
+              end if
+          next i_int
+       end if
+        disconnected = disconnected + 1
+          if disconnected >= 10 then
+             BAUDCON1.ABDEN = 1
+             disconnected = 9
+          end if
+       if i_t0 >=5 then
+      
+          i_t0 = 0
+          firmware_run_LED = not firmware_run_LED
+               i_wdt = i_wdt + 1
+               if i_wdt >= 6 then
+                i_wdt = 0
+               clear_wdt = 1
+               end if
+          
+       end if
+       INTCON.TMR0IF = 0
+    end if
+end sub
+
+sub procedure rxFrameProcessing()
+  
+  select case rxFrameState 
+    case PROCESSING 
+      rxFrameCaseProcessing()
+      if send_answer = 1 then
+         send_answer = 0
+         send_frame()
+      end if
+      rxFrameState = IDLE
+    
+    case FINISHED
+      rxFrameState = IDLE
+    case TIMED_OUT
+      rxFrameState = IDLE
+ end select
+
+end sub
+
+main:
+rxFrameState = IDLE
+ timeoutTimerState = _OFF_
+ext_msg_duration_cntr = 0
+clear_wdt = 0
+
+response_timer = 0
+send_answer = 0
+disconnected = 5
+Out_ = 0
+incRxBuffer =0
+P_cmd_flag = 0
+P_cmd_flag_ladr = output_number * 2
+pulse_data_update = 0
+pulse_duration_ladr = 0
+pulse_duration_hadr = 0
+reset_carte = 1
+for i_main = 0 to output_number-1
+    pulse_duration[i_main]= 0
+    pulse_time[i_main]= 0
+next i_main
+MCUInit()
+RS485_direction = 0
+
+in_communication = 1
+in_com_led_cntr = 0
+i2c_init1()
+
+first_use   = read_ext_eeprom(0X3F, 0xFF)
+if first_use = 0XFF then
+       clear_eeprom()
+end if
+
+''''''''''' flag sortie impulsion a 0X0020
+hi(P_cmd_flag) = read_ext_eeprom(pulse_duration_hadr,P_cmd_flag_ladr)
+lo(P_cmd_flag) = read_ext_eeprom(pulse_duration_hadr,P_cmd_flag_ladr+1)
+''''''''''''' les paramettres sortie imp de 0X0000 à 0X00001F
+for i_main = 0 to output_number-1
+    if P_cmd_flag.i_main = 1 then
+       hi(pulse_duration[i_main])= read_ext_eeprom(pulse_duration_hadr,pulse_duration_ladr)
+       lo(pulse_duration[i_main])= read_ext_eeprom(pulse_duration_hadr,pulse_duration_ladr +1)
+    end if
+    pulse_duration_ladr = pulse_duration_ladr + 2
+next i_main
+
+''''''''''''''''' les etat des sortie à 0X00025
+
+
+  for i_main = 0 to 29
+    trame_send[i_main] = "0"
+  next i_main
+checkExtAddress()
+
+   timeout_cmd = 0
+   timeout_counter = 0
+   timeout_x400us = 0
+
+
+  erase_memory = 0
+  INTCON.GIEL = 1
+  INTCON.GIEH = 1
+  BAUDCON1.ABDEN = 1
+ while(true)
+    if (RCSTA1.OERR = 1 ) OR (RCSTA1.FERR = 1 )then
+   
+       'OUT1 = NOT OUT1
+       TXSTA1   = 0X00
+       RCSTA1   = 0X00
+       TXSTA1.BRGH = 1
+       BAUDCON1.BRG16 = 1
+       SPBRGH1= %00000000
+       SPBRG1 = %01000100
+       TXSTA1.SYNC = 0
+       RCSTA1.SPEN = 1
+       TXSTA1.TXEN = 1
+       RCSTA1.CREN = 1
+       BAUDCON1.WUE = 0
+       BAUDCON1.ABDEN = 1
+     end if
+     rxFrameProcessing()
+     in_com_led_cntr  = in_com_led_cntr  + 1
+     if in_com_led_cntr = 100 then
+        in_communication  = 0
+     end if
+
+     out_com_led_cntr = out_com_led_cntr + 1
+     if out_com_led_cntr = 15000 then
+        out_communication = 0
+     end if
+
+       if pulse_data_update = 1 then
+         pulse_data_update = 0
+         in_communication = 1
+         in_com_led_cntr = 0
+         write_ext_eeprom(pulse_duration_hadr,P_cmd_flag_ladr,hi(P_cmd_flag))
+         write_ext_eeprom(pulse_duration_hadr,P_cmd_flag_ladr + 1,lo(P_cmd_flag))
+         write_ext_eeprom(pulse_duration_hadr,pulse_duration_ladr,hi(P_duration))
+         write_ext_eeprom(pulse_duration_hadr,pulse_duration_ladr + 1,lo(P_duration))
+      end if
+
+
+
+
+      
+      if erase_memory = 1 then
+         INTCON.GIEL = 0
+         INTCON.GIEH = 0
+         in_communication  = 0
+         firmware_run_LED  = 0
+         out_communication = 0
+         erase_memory = 0
+         clear_eeprom()
+         reset
+      end if
+
+             if clear_wdt = 1 then
+                clear_wdt = 0
+                asm
+                CLRWDT
+               end asm
+             end if
+      
+  wend
+
+end.

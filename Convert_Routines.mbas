@@ -1,0 +1,20 @@
+module Convert_Routines
+
+Sub function Chr_to_Hex(dim prm1,prm2 as byte) as byte 
+
+implements
+
+Sub function Chr_to_Hex(dim prm1,prm2 as byte) as byte   'org 0x1FF00
+   if prm1 < 58 then
+   result =  (prm1-48)*16
+   else
+   result =  (prm1-55)*16
+   end if
+
+   if prm2 < 58 then
+   result =  (prm2-48) + result
+   else
+   result =  (prm2-55) + result
+   end if
+end sub
+end.

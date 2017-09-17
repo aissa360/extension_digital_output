@@ -1,0 +1,10 @@
+
+*.dbg
+*.mcl
+*.log
+*.lst
+*.asm
+*.ini
+*.hex
+*.cfg
+*.dlt

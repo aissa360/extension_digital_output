@@ -1,0 +1,67 @@
+module I2C_Routines
+
+sub procedure i2c_init1()
+sub procedure i2c_check_idle1()
+sub function i2c_ack_check1 as byte
+sub procedure i2c_start1()
+sub procedure i2c_repeated_start1()
+sub procedure i2c_stop1()
+sub procedure i2c_write1(dim data_ as byte)
+sub function i2c_read1(dim ack as byte) as byte
+
+implements
+
+sub procedure i2c_init1()
+  SSP1CON1 = 0
+  TRISC.3 = 1       'SCL.     input
+  TRISC.4 = 1       'SDA.     input
+  SSP1STAT.SMP = 1        'Désactivé le controle de vitesse
+  SSP1STAT.CKE = 0        'désactivé le Msbus
+  SSP1ADD = 39            'periode = ((ADD+1)*4)/Fosc donc vitesse= 1/periode= 100 khz
+  SSP1CON1 = %00001000    'Choix de mode master avec la formule
+  SSP1CON1.SSPEN = 1      'Activé le port serie
+end sub
+
+sub procedure i2c_check_idle1()
+  while (SSP1STAT.R_W) or (SSP1CON2.SEN)or (SSP1CON2.RSEN)or (SSP1CON2.PEN)or (SSP1CON2.RCEN)or (SSP1CON2.ACKEN) <>0   'vérification de l'état de bus
+  wend
+end sub
+
+sub function i2c_ack_check1 as byte
+  i2c_check_idle1()
+  result  = SSP1CON2.ACKSTAT     'check if slave has sent an ACK.
+end sub
+
+sub procedure i2c_start1()        'Génerer un start
+  i2c_check_idle1()
+  SSP1CON2.SEN = 1
+end sub
+
+sub procedure i2c_repeated_start1()   'Restart pour la lecture
+  i2c_check_idle1()
+  SSP1CON2.RSEN = 1
+end sub
+
+sub procedure i2c_stop1()    'Génerer un stop
+  i2c_check_idle1()
+  SSP1CON2.PEN = 1
+end sub
+
+sub procedure i2c_write1(dim data_ as byte)  'Stocké la data dans le buffer temporairement pour l'envoi
+  i2c_check_idle1()
+  SSP1BUF = data_
+end sub
+
+sub function i2c_read1(dim ack as byte) as byte
+  i2c_check_idle1()
+  SSP1CON2.RCEN = 1           'enable receive
+  while SSP1STAT.BF <> 1      'byte received?.
+  wend
+  result = SSP1BUF                  'reception de la data
+  SSP1CON2.RCEN = 0                'disable receive
+  SSP1CON2.ACKDT = ack    '0:ACK, 1:NOT ACK.
+  i2c_check_idle1()
+  SSP1CON2.ACKEN = 1               'send ACK.
+end sub
+
+end.

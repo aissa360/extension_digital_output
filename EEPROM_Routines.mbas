@@ -1,0 +1,54 @@
+module EEPROM_Routines
+include "I2C_Routines"
+
+sub function read_ext_eeprom(dim addressh,addressl as byte)as byte
+sub procedure write_ext_eeprom(dim addressh,addressl,data_ as byte)
+
+implements
+
+sub procedure write_ext_eeprom(dim addressh,addressl,data_ as byte)
+   restart3:
+   i2c_start1()
+   i2c_write1(0xA0)
+   if i2c_ack_check1<> 0 then
+      goto restart3
+   end if
+   i2c_write1(addressh)
+   if i2c_ack_check1<> 0 then
+      goto restart3
+   end if
+   i2c_write1(addressl)
+   if i2c_ack_check1<> 0 then
+      goto restart3
+   end if
+   i2c_write1(data_)
+   if i2c_ack_check1<> 0 then
+      goto restart3
+   end if
+   i2c_stop1()
+end sub
+
+sub function read_ext_eeprom(dim addressh,addressl as byte)as byte
+ restart4:
+ i2c_start1()
+ i2c_write1(0xA0)
+ if i2c_ack_check1<> 0 then
+    goto restart4
+ end if
+ i2c_write1(addressh)
+ if i2c_ack_check1<> 0 then
+    goto restart4
+ end if
+ i2c_write1(addressl)
+ if i2c_ack_check1<> 0 then
+    goto restart4
+ end if
+ i2c_repeated_start1()
+ i2c_write1(0xA1)
+ if i2c_ack_check1<> 0 then
+    goto restart4
+ end if
+ result = i2c_read1(1)
+ i2c_stop1()
+end sub
+end.

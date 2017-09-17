@@ -1,0 +1,9 @@
+17/03/16
+*ext respond to controller's "R" without adr check.
+19/05/16
+*reset_card flag problem is fixed.
+26/10/16
+*check 1st use at start up, clear eeprom if it is the case.
+23/11/16
+*clrwdt is made within the main program
+
