@@ -1,8 +1,27 @@
 module Convert_Routines
 
-Sub function Chr_to_Hex(dim prm1,prm2 as byte) as byte 
+sub function Hex_to_ascii(dim number as byte) as byte
+sub function Hex_to_ascii2(dim number as byte) as byte
+Sub function Chr_to_Hex(dim prm1,prm2 as byte) as byte  
+sub function ascii_to_Hex(dim number as byte) as byte
 
 implements
+
+sub function Hex_to_ascii(dim number as byte) as byte
+   if (number and 0x0F ) <=9 then
+      result = (number and 0x0F ) + 48 'tram_recu[1]
+   else
+      result = (number and 0x0F ) + 55 'tram_recu[1]
+   end if
+end sub
+
+sub function Hex_to_ascii2(dim number as byte) as byte
+  if (number and 0x0F ) <=9 then
+     result = (number and 0x0F ) + 48 'tram_recu[1]
+  else
+     result = (number and 0x0F ) + 55 'tram_recu[1]
+  end if
+end sub
 
 Sub function Chr_to_Hex(dim prm1,prm2 as byte) as byte   'org 0x1FF00
    if prm1 < 58 then
@@ -17,4 +36,13 @@ Sub function Chr_to_Hex(dim prm1,prm2 as byte) as byte   'org 0x1FF00
    result =  (prm2-55) + result
    end if
 end sub
+
+sub function ascii_to_Hex(dim number as byte) as byte
+ if number  <= "9" then
+    result = number  - 48
+ else
+    result = number  - 55
+ end if
+end sub
+
 end.

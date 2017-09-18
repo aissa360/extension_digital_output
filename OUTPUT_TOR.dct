@@ -362,6 +362,7 @@ anselc
 anseld
 ansele
 apply_action
+ascii_to_hex
 asin
 atan
 atan2
@@ -1247,6 +1248,8 @@ gppub_pu6
 gppub_pu7
 half_pi
 halfbits
+hex_to_ascii
+hex_to_ascii2
 hfiofs
 hfiofs_bit
 hh
