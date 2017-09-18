@@ -269,7 +269,6 @@ sub procedure rxFrameCaseProcessing()
      case ord("d")
 
      erase_memory = 1
-     'txFrameSize =  7
      
      
      case ord("P")
@@ -305,10 +304,8 @@ sub procedure rxFrameCaseProcessing()
         pulse_time[out_N] = 0
         apply_action
      case "T" ''''@00T XXXX AAAA fcs 'XX les sortie concerné, AA state
-
-       select_output      =   Chr_to_Hex(rxBuffer[4],rxBuffer[5])*256 +  Chr_to_Hex(rxBuffer[6],rxBuffer[7])
-       stat_out           =   Chr_to_Hex(rxBuffer[8],rxBuffer[9])*256 +  Chr_to_Hex(rxBuffer[10],rxBuffer[11])
-
+      select_output      =   Chr_to_Hex(rxBuffer[4],rxBuffer[5])*256 +  Chr_to_Hex(rxBuffer[6],rxBuffer[7])
+      stat_out           =   Chr_to_Hex(rxBuffer[8],rxBuffer[9])*256 +  Chr_to_Hex(rxBuffer[10],rxBuffer[11])
 
       for i_receive  = 0 to output_number-1
           if select_output.i_receive = 1 then
@@ -327,7 +324,6 @@ sub procedure rxFrameCaseProcessing()
         trame_send[1] = (ExtAddress >> 4) and 0x0F + 48
         trame_send[2] =  ExtAddress and 0x0F + 48
         
-        'if (rxBuffer[4]=ext_type[1]) and (rxBuffer[5]=ext_type[0]) then
            trame_send[3] = "R"
            trame_send[4] = ext_type[1]
            trame_send[5] = ext_type[0]
