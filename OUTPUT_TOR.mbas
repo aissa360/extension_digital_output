@@ -320,14 +320,33 @@ sub procedure rxFrameCaseProcessing()
         disconnected = 0
         out_communication = 1
         out_com_led_cntr = 0
-        trame_send[0] = "@"
-        trame_send[1] = (ExtAddress >> 4) and 0x0F + 48
-        trame_send[2] =  ExtAddress and 0x0F + 48
-        
-           trame_send[3] = "R"
-           trame_send[4] = ext_type[1]
-           trame_send[5] = ext_type[0]
-           txFrameSize = 9
+        trame_send[0]  = "@"
+        trame_send[1]  = (ExtAddress >> 4) and 0x0F + 48
+        trame_send[2]  =  ExtAddress and 0x0F + 48
+        trame_send[3]  = "R"
+        trame_send[4]  = OUT1*1  + 48
+        trame_send[5]  = OUT2*1  + 48
+        trame_send[6]  = OUT3*1  + 48
+        trame_send[7]  = OUT4*1  + 48
+        trame_send[8]  = OUT5*1  + 48
+        trame_send[9]  = OUT6*1  + 48
+        trame_send[10] = OUT7*1  + 48
+        trame_send[11] = OUT8*1  + 48
+        trame_send[12] = OUT9*1  + 48
+        trame_send[13] = OUT10*1 + 48
+        trame_send[14] = OUT11*1 + 48
+        trame_send[15] = OUT12*1 + 48
+        trame_send[16] = OUT13*1 + 48
+        trame_send[17] = OUT14*1 + 48
+        trame_send[18] = OUT15*1 + 48
+        trame_send[19] = OUT16*1 + 48
+        trame_send[20] = "0"
+        trame_send[21] = "0"
+        trame_send[22] = "0"
+        trame_send[12] = "0"
+        trame_send[24] = ext_type[1]
+        trame_send[25] = ext_type[0]
+        txFrameSize = 29
         send_answer = 1
         'send_frame()
    end select
